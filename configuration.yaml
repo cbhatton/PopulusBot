@@ -1,0 +1,15 @@
+connectors:
+  matrix:
+    mxid: "@pop-bot:matrix.org"
+    password: "the testing password"
+    rooms:
+      main:
+          alias: '#pop-bot-test:matrix.org'
+    nick: "Philo Bot"
+    homeserver: "https://matrix.org"
+
+skills:
+  no-cache: true
+  philo-find:
+    path: ./skills/find.py
+    setup: ./setup.json
