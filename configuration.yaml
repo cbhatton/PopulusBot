@@ -1,7 +1,7 @@
 connectors:
   matrix:
-    mxid: "@pop-bot:matrix.org"
-    password: "the testing password"
+    mxid: "{Your mxid}"
+    password: "{Your password}"
     rooms:
       main:
           alias: '#pop-bot-test:matrix.org'
@@ -12,4 +12,4 @@ skills:
   no-cache: true
   philo-find:
     path: ./skills/find.py
-    setup: ./setup.json
+    setup: ./setup.json # default
