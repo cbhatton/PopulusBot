@@ -1,7 +1,7 @@
 connectors:
   matrix:
-    mxid: "{Your mxid}"
-    password: "{Your password}"
+    mxid: "@rick_deck2049:matrix.org"
+    password: "replicant2049"
     rooms:
       main:
           alias: '#pop-bot-test:matrix.org'

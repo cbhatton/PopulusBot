@@ -6,6 +6,7 @@ from opsdroid.matchers import match_always
 
 import nio
 import json
+import string
 
 class PhiloFinder(Skill):
 
@@ -38,11 +39,14 @@ class PhiloFinder(Skill):
         """Search for matrix rooms with downloadable content"""
         state = await connector.room_get_state(room)
 
-        # TO DO: type check for pdfs
 
         for event in state.events:
             url = self.search_content(event, 'url')
+            # type check for pdfs
             if url is not None:
+                content_type = self.search_content(event, 'mimetype')
+                if content_type == 'video/mp4':
+                    url = None
                 break
 
         if url is not None:
@@ -55,8 +59,13 @@ class PhiloFinder(Skill):
             except Exception:
                 names = None
 
-            if names is not None:
-                await self.create_annotation(names, room)
+            names = self.alphabetize(names)
+            content = []
+            for a in string.ascii_lowercase:
+                if len(names[a]) > 0:
+                    content.append(names[a])
+
+            await self.create_annotation(content, room)
 
     def download_pdf(self, url):
         """Use a Matrix URI to download the pages pdf"""
@@ -76,12 +85,8 @@ class PhiloFinder(Skill):
 
     async def create_annotation(self, content: list, room_id: str):
         """Create a Populus annotation"""
-        comment = "Philosophers of Note:\n"
-        for item in content:
-            comment += f'{item}: {self.__search_terms[item]}\n'
-
         connector = self.opsdroid.get_connector('matrix').connection
-        await connector.room_get_state(room_id)
+        state = await connector.room_get_state(room_id)
 
         room = await connector.room_create(visibility=nio.RoomVisibility.public, name='List of famous philosophers', alias='',
                                            federate=False)
@@ -92,9 +97,9 @@ class PhiloFinder(Skill):
                             'activityStatus': 'open',
                             'creator': f'{connector.user_id}',
                             'rootContent': {
-                                'body': f'{comment}', # TO DO: formating in comment
+                                'body': f'Notable Words',
                                 'format': 'org.matrix.custom.html',
-                                'formatted_body': f'<p>{comment}</p>\n',
+                                'formatted_body': f'<p>Notable Words</p>\n',
                                 'msgtype': 'm.text'
                             },
                             'rootEventId': '$JK7siG-cGhL3hCnk8HTPfxoI3nEutp5SwdfwLCzzq7U'
@@ -103,6 +108,36 @@ class PhiloFinder(Skill):
                     'via': ['matrix.org']
                 }, event_type='m.space.child', state_key=room.room_id
             )
+
+        for group in content:
+            await self.message(connector, room, group)
+
+    async def message(self, connector, room, content):
+        comment = ""
+        html = ''
+        for item in content:
+            comment += f'{item}\n\n'
+            html += f'<p><a href=\"{self.__search_terms[item]}\">{item}</a></p>\n'
+
+        message_content = {
+            "body": f'{comment}',
+            "format": "org.matrix.custom.html",
+            "formatted_body": f'{html}',
+            "msgtype": "m.text",
+            "org.matrix.msc1767.message": [
+                {
+                    "body": f'{comment}',
+                    "mimetype": "text/plain"
+                },
+                {
+                    "body": f'{html}',
+                    "mimetype": "text/html"
+                }
+            ]
+        }
+
+        response = await connector.room_send(room_id=room.room_id, message_type='m.room.message',
+                                             content=message_content)
 
     def search_content(self, content: dict, search_term: str):
         """Search A Matrix State Event."""
@@ -113,6 +148,29 @@ class PhiloFinder(Skill):
                 found = self.search_content(content[item], search_term)
                 if found is not None:
                     return found
+
+    def alphabetize(self, list: list, last_name: bool = True):
+        alpha_dict = dict.fromkeys(string.ascii_lowercase, [])
+
+        if last_name:
+            for i in range(len(list)):
+                try:
+                    alpha = list[i].split(' ')
+                    alpha = alpha[-1][0]
+                    alpha = alpha.lower()
+
+                    alpha_dict[alpha] = alpha_dict[alpha] + [list[i]]
+                except Exception as e:
+                    print('EXCEPTION: ', e, 'CASE: ', list[i], 'ALPHA: ', alpha)
+        else:
+            for item in list:
+                try:
+                    letter = item[0].lower()
+                    alpha_dict[letter].append(item)
+                except Exception as e:
+                    print('EXCEPTION: ', e, 'CASE: ', item)
+
+        return alpha_dict
 
 
 class PdfParse:
@@ -140,7 +198,12 @@ class PdfParse:
         term_list = list()
         for term in terms:
             item = term.lower()
+            item = item.replace(' ', '')
             if item in pdf_str:
                 term_list.append(term)
 
         return term_list
+
+
+if __name__ == '__main__':
+    pdf = PdfParse('download.pdf')
